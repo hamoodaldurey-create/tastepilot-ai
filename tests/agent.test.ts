@@ -9,6 +9,7 @@ function mockQloo(calls: URL[], failCategory = ""): typeof fetch {
   return async (url, init) => {
     const u = new URL(String(url)); calls.push(u);
     assert.equal(new Headers(init?.headers).get("X-Api-Key"), "test-only-key");
+    assert.equal(init?.redirect, "manual");
     assert.equal(u.searchParams.has("api_key"), false);
     if (u.pathname === "/search") return Response.json({ results: [entity] });
     if (u.pathname === "/v2/tags") return Response.json({ results: { tags: [{ id: "urn:tag:category:place:restaurant", name: "Restaurant" }] } });
@@ -32,6 +33,17 @@ test("feedback changes signals and exclusions, including when Qloo returns an ex
   for (const u of calls.filter(u => u.pathname === "/v2/insights")) {
     assert.ok(u.searchParams.get("signal.interests.entities")?.includes(C)); assert.ok(u.searchParams.get("filter.exclude.entities")?.includes(B));
   }
+});
+test("Qloo requests do not pass the client as the native fetch receiver", async () => {
+  let calls = 0;
+  const fetcher: typeof fetch = async function (this: unknown, url, init) {
+    assert.equal(this, undefined, "Worker native fetch rejects an object receiver");
+    calls++;
+    return mockQloo([])(url, init);
+  };
+  const result = await runAgent(validateBrief(input), new QlooClient("test-only-key", undefined, fetcher));
+  assert.equal(calls, 4);
+  assert.equal(result.recommendations.length, 3);
 });
 test("a category failure preserves successful results and surfaces a warning", async () => {
   const result = await runAgent(validateBrief(input), new QlooClient("test-only-key", undefined, mockQloo([], "destination")));
