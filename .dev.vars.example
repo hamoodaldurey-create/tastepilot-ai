@@ -1,0 +1,3 @@
+# Local Worker bindings only. Never commit a real key.
+QLOO_API_KEY=
+QLOO_API_URL=https://hackathon.api.qloo.com
