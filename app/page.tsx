@@ -26,14 +26,16 @@ export default function Home() {
   const [tab, setTab] = useState("all"), [submitted, setSubmitted] = useState("");
   const brief: Brief = { favorites, city, priceLevel: Number(priceLevel), categories, likedIds, excludedIds };
   const changed = !!result && JSON.stringify(brief) !== submitted;
-  async function discover(event?: React.FormEvent) {
+  async function discover(event?: React.FormEvent, selectedCategories?: Category[]) {
     event?.preventDefault(); if (loading) return;
+    const searchBrief = selectedCategories ? { ...brief, categories: selectedCategories } : brief;
+    if (selectedCategories) setCategories(selectedCategories);
     setLoading(true); setError("");
     try {
-      const response = await fetch("/api/plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(brief), signal: AbortSignal.timeout(65_000) });
+      const response = await fetch("/api/plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(searchBrief), signal: AbortSignal.timeout(65_000) });
       const data = await response.json() as PlanResult & { error?: string };
       if (!response.ok) throw new Error(data.error || "Recommendations could not be loaded.");
-      setResult(data); setSubmitted(JSON.stringify(brief)); setTab("all");
+      setResult(data); setSubmitted(JSON.stringify(searchBrief)); setTab(selectedCategories?.length === 1 ? selectedCategories[0] : "all");
     } catch (e) { setError(e instanceof Error && e.name !== "TimeoutError" ? e.message : "The search took too long. Please try again."); }
     finally { setLoading(false); }
   }
@@ -64,7 +66,7 @@ export default function Home() {
           {liked.length > 0 && <div className="shortlist"><Heart size={18}/><div><strong>Your shortlist</strong><p>{liked.map(r => r.name).join(" · ")}</p><span>Update your discoveries to use these as additional taste signals.</span></div></div>}
           {excludedIds.length > 0 && <button className="text-button restore-button" onClick={() => setExcludedIds([])}>Restore {excludedIds.length} hidden {excludedIds.length === 1 ? "result" : "results"}</button>}
           <details className="agent-trace"><summary><Sparkles size={17}/> How your discoveries came together <span>{result.steps.length} steps</span></summary><ol>{result.steps.map((step, i) => <li key={`${i}-${step.tool}`}><span className={step.status === "warning" ? "trace-number warning-number" : "trace-number"}>{i + 1}</span><div><strong>{step.tool}</strong><p>{step.detail}</p></div></li>)}</ol><p className="trace-footnote">Qloo supplies the recommendations. TastePilot coordinates tools and feedback with a deterministic agent; it does not use a language model. Affinity values are model scores, not satisfaction probabilities.</p></details><p className="result-footnote">Dining is local to {result.city}. Travel ideas are worldwide; film availability varies. Verify opening hours, prices, and availability directly.</p>
-        </> : <div className="welcome-board"><div className="welcome-mark"><Compass size={40}/></div><h3>Your next favorite is out there.</h3><p>Start with a few things you already love.<br/>We’ll find the unexpected connections.</p><div className="domain-cards">{(Object.keys(labels) as Category[]).map((c, i) => { const Icon = icons[c]; return <div className={`domain-card domain-${c}`} key={c}><span className="domain-index">0{i + 1}</span><Icon size={27}/><strong>{labels[c]}</strong><p>{c === "dining" ? "A table that fits your taste." : c === "travel" ? "Somewhere you’d love to go." : "Your next favorite film."}</p></div>; })}</div><div className="connection-note"><Sparkles size={18}/><span>Your favorite film can lead you to your next favorite restaurant.</span></div></div>}</div>
+        </> : <div className="welcome-board"><div className="welcome-mark"><Compass size={40}/></div><h3>Your next favorite is out there.</h3><p>Start with a few things you already love.<br/>We’ll find the unexpected connections.</p><div className="domain-cards">{(Object.keys(labels) as Category[]).map((c, i) => { const Icon = icons[c]; return <button type="button" className={`domain-card domain-${c}`} style={{ textAlign: "left", font: "inherit", color: "inherit" }} key={c} disabled={loading || favorites.some(f => !f.name.trim())} onClick={() => discover(undefined, [c])} aria-label={`Discover ${labels[c].toLowerCase()}`}><span className="domain-index">0{i + 1}</span><Icon size={27}/><strong>{labels[c]}</strong><p>{c === "dining" ? "A table that fits your taste." : c === "travel" ? "Somewhere you’d love to go." : "Your next favorite film."}</p></button>; })}</div><div className="connection-note"><Sparkles size={18}/><span>Your favorite film can lead you to your next favorite restaurant.</span></div></div>}</div>
       </section>
     </main><footer><span>TastePilot AI · Built by Hamood Al Durey</span><span>Qloo Agentic Hackathon</span></footer>
   </div>;
