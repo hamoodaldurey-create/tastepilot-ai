@@ -45,13 +45,16 @@ export class QlooClient {
     if (!key) throw new TastePilotError("not_configured", "Live recommendations are being configured. Please try again shortly.", 503);
     if (!["https://hackathon.api.qloo.com", "https://api.qloo.com"].includes(base.replace(/\/$/, ""))) throw new TastePilotError("configuration_error", "The recommendation service needs attention.", 503);
     this.base = base.replace(/\/$/, "");
-    this.key = key; this.fetcher = fetcher;
+    // Worker fetch must be called without the QlooClient as its receiver.
+    // Calling a stored native fetch as this.fetcher() throws Illegal invocation.
+    this.key = key; this.fetcher = (input, init) => fetcher(input, init);
   }
   async get(path: "/search" | "/v2/insights" | "/v2/tags", params: Record<string, string>): Promise<QlooResponse> {
     const url = new URL(path, this.base);
     url.search = new URLSearchParams(params).toString();
     let response: Response;
-    try { response = await this.fetcher(url, { headers: { "X-Api-Key": this.key, Accept: "application/json" }, signal: AbortSignal.timeout(12_000), redirect: "error" }); }
+    // Workers support manual redirects. Never forward the key to a redirect.
+    try { response = await this.fetcher(url, { headers: { "X-Api-Key": this.key, Accept: "application/json" }, signal: AbortSignal.timeout(12_000), redirect: "manual" }); }
     catch { throw new TastePilotError("service_unavailable", "Qloo could not be reached. Please try again."); }
     if (!response.ok) {
       if ([401, 403].includes(response.status)) throw new TastePilotError("authentication_required", "The Qloo connection needs attention.", 503);
